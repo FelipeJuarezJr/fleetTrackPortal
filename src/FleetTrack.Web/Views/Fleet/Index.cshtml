@@ -1,0 +1,398 @@
+@model FleetTrack.Web.ViewModels.FleetDashboardViewModel
+@{
+    ViewData["Title"] = "Fleet Inventory & Sales Grid";
+}
+
+<div class="dashboard-wrapper">
+    <!-- Page Header & Actions -->
+    <div class="page-title-bar">
+        <div>
+            <h1 class="page-heading">Commercial Fleet Inventory</h1>
+            <p class="page-subheading">
+                Real-time inventory grid executing parameterized stored procedures (<code>sp_GetAvailableFleetUnits</code> &amp; <code>sp_CreateSalesOrder</code>) on Azure SQL.
+            </p>
+        </div>
+        <div class="title-actions">
+            <button id="btn-refresh-grid" class="btn btn-secondary" title="Reload inventory via AJAX">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Refresh Grid</span>
+            </button>
+            <button id="btn-export-csv" class="btn btn-outline" title="Export current dataset to CSV">
+                <i class="fa-solid fa-file-csv"></i>
+                <span>Export CSV</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 1. Summary KPI Cards Section -->
+    <section class="kpi-grid" id="kpi-section">
+        <!-- Total Fleet Units -->
+        <div class="kpi-card" id="kpi-total-units">
+            <div class="kpi-icon-box blue">
+                <i class="fa-solid fa-truck-ramp-box"></i>
+            </div>
+            <div class="kpi-content">
+                <span class="kpi-label">Total Fleet Units</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-val-total">@(Model.Kpis.TotalFleetUnits > 0 ? Model.Kpis.TotalFleetUnits.ToString("N0") : "--")</span>
+                    <span class="kpi-trend positive"><i class="fa-solid fa-layer-group"></i> Active DB</span>
+                </div>
+                <span class="kpi-footnote">All registered commercial assets</span>
+            </div>
+        </div>
+
+        <!-- Ready for Sale -->
+        <div class="kpi-card highlight-success" id="kpi-ready-units">
+            <div class="kpi-icon-box green">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="kpi-content">
+                <span class="kpi-label">Ready for Sale</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value text-success" id="kpi-val-ready">@(Model.Kpis.ReadyForSaleUnits > 0 ? Model.Kpis.ReadyForSaleUnits.ToString("N0") : "--")</span>
+                    <span class="kpi-trend positive" id="kpi-val-ready-percent">Available</span>
+                </div>
+                <span class="kpi-footnote">Inspected &amp; priced for immediate order</span>
+            </div>
+        </div>
+
+        <!-- Units Sold This Month -->
+        <div class="kpi-card" id="kpi-sold-month">
+            <div class="kpi-icon-box purple">
+                <i class="fa-solid fa-handshake"></i>
+            </div>
+            <div class="kpi-content">
+                <span class="kpi-label">Units Sold This Month</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value" id="kpi-val-sold-month">@(Model.Kpis.UnitsSoldThisMonth.ToString("N0"))</span>
+                    <span class="kpi-trend neutral"><i class="fa-solid fa-calendar"></i> Current MTD</span>
+                </div>
+                <span class="kpi-footnote">Processed via <code>sp_CreateSalesOrder</code></span>
+            </div>
+        </div>
+
+        <!-- Total Asset Valuation -->
+        <div class="kpi-card" id="kpi-valuation">
+            <div class="kpi-icon-box amber">
+                <i class="fa-solid fa-sack-dollar"></i>
+            </div>
+            <div class="kpi-content">
+                <span class="kpi-label">Active Inventory Valuation</span>
+                <div class="kpi-value-row">
+                    <span class="kpi-value text-mono" id="kpi-val-valuation">@(Model.Kpis.ActiveInventoryValuation > 0 ? Model.Kpis.ActiveInventoryValuation.ToString("C0") : "--")</span>
+                </div>
+                <span class="kpi-footnote">Cumulative asking price of available stock</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. Filtering & Search Toolbar -->
+    <section class="filter-panel">
+        <div class="filter-row">
+            <!-- Search Query Input -->
+            <div class="filter-group search-group">
+                <label for="filter-search" class="filter-label">Search Inventory</label>
+                <div class="input-icon-wrapper">
+                    <i class="fa-solid fa-magnifying-glass input-icon"></i>
+                    <input type="text" id="filter-search" class="form-control" placeholder="Search by Equipment #, VIN, Make, Model..." autocomplete="off" />
+                    <button type="button" id="btn-clear-search" class="input-clear-btn" style="display:none;" title="Clear search">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Location Dropdown -->
+            <div class="filter-group">
+                <label for="filter-location" class="filter-label">Location / Terminal</label>
+                <div class="select-wrapper">
+                    <select id="filter-location" class="form-select">
+                        <option value="">All Hub Locations</option>
+                        @foreach (var loc in Model.AvailableLocations)
+                        {
+                            <option value="@loc">@loc</option>
+                        }
+                    </select>
+                    <i class="fa-solid fa-chevron-down select-icon"></i>
+                </div>
+            </div>
+
+            <!-- Condition Status Dropdown -->
+            <div class="filter-group">
+                <label for="filter-status" class="filter-label">Condition Status</label>
+                <div class="select-wrapper">
+                    <select id="filter-status" class="form-select">
+                        <option value="">All Statuses</option>
+                        @foreach (var st in Model.ConditionStatuses)
+                        {
+                            <option value="@st">@st</option>
+                        }
+                    </select>
+                    <i class="fa-solid fa-chevron-down select-icon"></i>
+                </div>
+            </div>
+
+            <!-- Quick Filter Reset -->
+            <div class="filter-group filter-actions-group">
+                <label class="filter-label">&nbsp;</label>
+                <button type="button" id="btn-reset-filters" class="btn btn-ghost" title="Reset all search filters">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                    <span>Reset</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Metrics Bar -->
+        <div class="filter-status-bar">
+            <div class="record-counter">
+                Showing <strong id="visible-record-count">0</strong> units matching criteria
+            </div>
+            <div class="quick-status-pills">
+                <button type="button" class="status-pill active" data-status="">All</button>
+                <button type="button" class="status-pill" data-status="Ready for Sale">Ready for Sale</button>
+                <button type="button" class="status-pill" data-status="Pending Inspection">Pending Inspection</button>
+                <button type="button" class="status-pill" data-status="Under Maintenance">Under Maintenance</button>
+                <button type="button" class="status-pill" data-status="Sold">Sold</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Interactive Fleet Grid Table -->
+    <section class="grid-card">
+        <div class="table-responsive">
+            <table class="fleet-table" id="fleet-inventory-table">
+                <thead>
+                    <tr>
+                        <th class="col-equip" data-sort="equipmentNumber">
+                            Equipment # <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-vehicle" data-sort="make">
+                            Vehicle Details <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-vin">VIN</th>
+                        <th class="col-mileage text-right" data-sort="mileage">
+                            Mileage <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-location" data-sort="currentLocation">
+                            Location <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-price text-right" data-sort="askingPrice">
+                            Asking Price <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-status text-center" data-sort="conditionStatus">
+                            Status <i class="fa-solid fa-sort sort-icon"></i>
+                        </th>
+                        <th class="col-actions text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fleet-table-body">
+                    <!-- Dynamic Rows populated by fleet-portal.js via AJAX -->
+                    <tr class="loading-row">
+                        <td colspan="8" class="text-center py-5">
+                            <div class="spinner-container">
+                                <div class="spinner-enterprise"></div>
+                                <p class="spinner-text">Querying Azure SQL Database via <code>sp_GetAvailableFleetUnits</code>...</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State Container -->
+        <div id="fleet-empty-state" class="empty-state-box" style="display: none;">
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-truck-field"></i>
+            </div>
+            <h3 class="empty-state-title">No Fleet Units Found</h3>
+            <p class="empty-state-text">No inventory records match your selected filters or search keyword.</p>
+            <button type="button" class="btn btn-secondary mt-3" onclick="FleetPortal.resetFilters()">
+                <i class="fa-solid fa-filter-circle-xmark"></i> Clear Filters
+            </button>
+        </div>
+    </section>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 1: Create Sales Order (Atomic Transaction sp_CreateSalesOrder) -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop" id="modal-create-order" style="display: none;">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                    <div>
+                        <h2 class="modal-title">Generate Sales Order</h2>
+                        <span class="modal-subtitle">Atomic transaction via <code>sp_CreateSalesOrder</code></span>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="FleetPortal.closeOrderModal()" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-create-order" novalidate>
+                <div class="modal-body">
+                    <!-- Selected Unit Summary Card -->
+                    <div class="unit-summary-card">
+                        <div class="unit-summary-header">
+                            <span class="summary-equip" id="modal-order-equip-number">TRK-00000</span>
+                            <span class="badge badge-ready" id="modal-order-status">Ready for Sale</span>
+                        </div>
+                        <div class="unit-summary-details">
+                            <div class="summary-item">
+                                <span class="summary-label">Vehicle:</span>
+                                <strong class="summary-value" id="modal-order-vehicle">2021 Freightliner M2</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">VIN:</span>
+                                <span class="summary-value text-mono" id="modal-order-vin">1FVACWDT8HH129841</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Mileage:</span>
+                                <span class="summary-value" id="modal-order-mileage">142,350 mi</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Listed Price:</span>
+                                <strong class="summary-value text-emerald text-mono" id="modal-order-asking-price">$48,500.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden Unit ID -->
+                    <input type="hidden" id="order-unit-id" name="unitId" value="" />
+
+                    <!-- Form Inputs -->
+                    <div class="form-group mb-3">
+                        <label for="order-buyer-name" class="form-label required">Buyer / Commercial Entity Name</label>
+                        <input type="text" id="order-buyer-name" name="buyerName" class="form-control" placeholder="e.g. Apex Logistics Midwest LLC" required maxlength="100" />
+                        <div class="invalid-feedback" id="val-buyer-name">Please provide a buyer or company name.</div>
+                    </div>
+
+                    <div class="form-row mb-3">
+                        <div class="col-md-6 form-group">
+                            <label for="order-sale-price" class="form-label required">Agreed Sale Price ($ USD)</label>
+                            <div class="input-currency-wrapper">
+                                <span class="currency-prefix">$</span>
+                                <input type="number" step="0.01" min="1" id="order-sale-price" name="salePrice" class="form-control text-mono" placeholder="48500.00" required />
+                            </div>
+                            <div class="invalid-feedback" id="val-sale-price">Enter a valid positive sale price.</div>
+                        </div>
+
+                        <div class="col-md-6 form-group">
+                            <label for="order-custom-number" class="form-label">Order Number (Optional)</label>
+                            <input type="text" id="order-custom-number" name="customOrderNumber" class="form-control text-mono" placeholder="Auto-generated if blank" maxlength="30" />
+                            <small class="form-text">e.g. SO-202603-XXXXX</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="order-notes" class="form-label">Transaction Notes / Wire Details</label>
+                        <textarea id="order-notes" name="notes" class="form-control" rows="3" placeholder="Enter wholesale broker notes, financing terms, export clearance..." maxlength="2000"></textarea>
+                    </div>
+
+                    <div class="transaction-warning-box">
+                        <i class="fa-solid fa-shield-halved text-amber"></i>
+                        <span>Submitting will atomically commit the order record and lock the fleet unit's status to <strong>'Sold'</strong>.</span>
+                    </div>
+
+                    <div id="modal-order-error-alert" class="alert alert-danger" style="display: none;"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" onclick="FleetPortal.closeOrderModal()">Cancel</button>
+                    <button type="submit" id="btn-submit-order" class="btn btn-primary">
+                        <span class="btn-spinner" style="display:none;"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                        <span class="btn-text"><i class="fa-solid fa-check"></i> Finalize Sales Order</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: Vehicle Inspection & Details Modal -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop" id="modal-unit-details" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge blue">
+                        <i class="fa-solid fa-truck"></i>
+                    </div>
+                    <div>
+                        <h2 class="modal-title" id="details-equip-title">Unit Specification Sheet</h2>
+                        <span class="modal-subtitle">Direct SQL Record Inspection</span>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="FleetPortal.closeDetailsModal()" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="details-modal-body">
+                <!-- Dynamically rendered via FleetPortal.showDetails -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="FleetPortal.closeDetailsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: Architecture & Telemetry Modal -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop" id="modal-telemetry" style="display: none;">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge purple">
+                        <i class="fa-solid fa-satellite-dish"></i>
+                    </div>
+                    <div>
+                        <h2 class="modal-title">Cloud Readiness &amp; Telemetry</h2>
+                        <span class="modal-subtitle">Azure App Service + Application Insights Integration</span>
+                    </div>
+                </div>
+                <button type="button" class="modal-close" onclick="$('#modal-telemetry').fadeOut(150)" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="telemetry-grid">
+                    <div class="telemetry-card">
+                        <div class="tel-header"><i class="fa-brands fa-microsoft"></i> Hosting Architecture</div>
+                        <div class="tel-body">
+                            <p><strong>Platform:</strong> Azure App Service (Linux / Windows .NET 8 runtime)</p>
+                            <p><strong>Config Binding:</strong> <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code> &amp; <code>ConnectionStrings__DefaultConnection</code></p>
+                            <p><strong>Environment:</strong> @Model.AppEnvironment</p>
+                        </div>
+                    </div>
+                    <div class="telemetry-card">
+                        <div class="tel-header"><i class="fa-solid fa-database"></i> Database Engine</div>
+                        <div class="tel-body">
+                            <p><strong>Target:</strong> Azure SQL Database (Serverless or Provisioned DTU/vCore)</p>
+                            <p><strong>Protocol:</strong> Parameterized Stored Procedures via <code>Microsoft.Data.SqlClient</code> &amp; <code>Dapper</code></p>
+                            <p><strong>Resilience:</strong> Automatic connection pooling &amp; row-level transactional isolation (<code>UPDLOCK</code>)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-preview-box mt-3">
+                    <div class="code-preview-header">
+                        <span>Azure App Service Deployment Command</span>
+                    </div>
+                    <pre class="code-snippet">az webapp up --name fleettrack-portal --resource-group rg-fleettrack --plan plan-fleettrack --runtime "DOTNETCORE:8.0"</pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="$('#modal-telemetry').fadeOut(150)">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

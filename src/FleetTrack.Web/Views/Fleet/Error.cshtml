@@ -1,0 +1,28 @@
+@model FleetTrack.Web.Controllers.ErrorViewModel
+@{
+    ViewData["Title"] = "Application Error";
+}
+
+<div class="error-page-wrapper">
+    <div class="error-card">
+        <div class="error-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h1 class="error-title">An Error Occurred</h1>
+        <p class="error-message">An unexpected error occurred while executing the database operation.</p>
+
+        @if (Model.ShowRequestId)
+        {
+            <div class="request-id-box">
+                <small>Request Correlation ID (Application Insights):</small>
+                <code>@Model.RequestId</code>
+            </div>
+        }
+
+        <div class="mt-4">
+            <a href="/" class="btn btn-primary">
+                <i class="fa-solid fa-house"></i> Return to Inventory
+            </a>
+        </div>
+    </div>
+</div>
