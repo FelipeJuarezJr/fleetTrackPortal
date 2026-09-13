@@ -120,6 +120,20 @@ public class FleetRepository : IFleetRepository
     }
 
     /// <inheritdoc />
+    public Task<SalesOrder> CreateSalesOrderAsync(CreateSalesOrderRequest request, string createdBy, CancellationToken cancellationToken = default)
+    {
+        var dto = new SalesOrderCreateDto
+        {
+            UnitId = request.UnitId,
+            BuyerName = request.BuyerName,
+            SalePrice = request.SalePrice,
+            Notes = request.Notes,
+            CustomOrderNumber = request.OrderNumber
+        };
+
+        return CreateSalesOrderAsync(dto, createdBy, cancellationToken);
+    }
+
     public async Task<FleetSummaryKpis> GetFleetSummaryKpisAsync(CancellationToken cancellationToken = default)
     {
         try

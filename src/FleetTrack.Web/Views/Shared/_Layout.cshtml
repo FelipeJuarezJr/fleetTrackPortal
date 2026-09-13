@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>@ViewData["Title"] - FleetTrack & Sales Portal</title>
     
     <!-- Google Fonts: Inter -->
@@ -17,9 +20,12 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="enterprise-theme">
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
     <div class="app-layout">
         <!-- Sidebar Navigation -->
-        <aside class="app-sidebar">
+        <aside class="app-sidebar" id="app-sidebar">
             <div class="sidebar-header">
                 <div class="brand-logo">
                     <div class="logo-icon">
@@ -30,6 +36,9 @@
                         <span class="brand-badge">Azure SQL</span>
                     </div>
                 </div>
+                <button type="button" class="sidebar-close-btn" id="btn-close-sidebar" aria-label="Close sidebar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <div class="sidebar-user">
@@ -49,7 +58,7 @@
                     <span>Fleet Inventory</span>
                     <span class="nav-counter" id="sidebar-active-counter">...</span>
                 </a>
-                <a href="#sales-section" class="nav-item" id="nav-sales">
+                <a href="#sales-orders" class="nav-item" id="nav-sales" onclick="FleetPortal.filterByStatus('Sold'); return false;">
                     <i class="fa-solid fa-file-invoice-dollar"></i>
                     <span>Sales Orders</span>
                 </a>
@@ -91,13 +100,13 @@
                     <div class="breadcrumb">
                         <span class="breadcrumb-root">Fleet Operations</span>
                         <i class="fa-solid fa-chevron-right breadcrumb-separator"></i>
-                        <span class="breadcrumb-current">Inventory & Sales Portal</span>
+                        <span class="breadcrumb-current">Inventory &amp; Sales</span>
                     </div>
                 </div>
 
                 <div class="header-right">
                     <!-- Environment Tag -->
-                    <div class="env-pill">
+                    <div class="env-pill hide-on-small-mobile">
                         <i class="fa-solid fa-cloud"></i>
                         <span>Azure App Service</span>
                     </div>
@@ -105,13 +114,13 @@
                     <!-- Live DB Indicator -->
                     <div class="db-indicator" title="Connected to Azure SQL Database">
                         <span class="db-ping-dot"></span>
-                        <span class="db-text">Azure SQL (1433)</span>
+                        <span class="db-text">Azure SQL</span>
                     </div>
 
                     <!-- App Insights Indicator -->
                     <button class="header-btn" title="View Application Insights Telemetry" onclick="FleetPortal.showTelemetryModal()">
                         <i class="fa-solid fa-satellite-dish"></i>
-                        <span class="btn-label">Telemetry</span>
+                        <span class="btn-label hide-on-mobile">Telemetry</span>
                     </button>
                 </div>
             </header>
@@ -124,21 +133,45 @@
             <!-- Global Footer -->
             <footer class="app-footer">
                 <div class="footer-left">
-                    <span>FleetTrack Enterprise Solutions Portal &copy; @DateTime.UtcNow.Year. High-Concurrency Proof-of-Concept.</span>
+                    <span>FleetTrack Enterprise &copy; @DateTime.UtcNow.Year</span>
                 </div>
                 <div class="footer-right">
-                    <span>Architecture: ASP.NET Core MVC + WebAPI + Dapper T-SQL + jQuery 3.x</span>
+                    <span>ASP.NET Core 8 &bull; Azure SQL</span>
                 </div>
             </footer>
         </div>
     </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile quick actions">
+        <a href="/" class="mobile-nav-item active" id="mobile-nav-inventory">
+            <i class="fa-solid fa-truck-ramp-box"></i>
+            <span>Fleet</span>
+        </a>
+        <button type="button" class="mobile-nav-item" id="mobile-nav-search" onclick="FleetPortal.focusSearch();">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>Search</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="mobile-nav-filter" onclick="FleetPortal.toggleFilterDrawer();">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Filter</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="mobile-nav-refresh" onclick="FleetPortal.refresh();">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Refresh</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="mobile-nav-telemetry" onclick="FleetPortal.showTelemetryModal();">
+            <i class="fa-solid fa-cloud"></i>
+            <span>Cloud</span>
+        </button>
+    </nav>
 
     <!-- Global Toast Notification Container -->
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Core Scripts: jQuery 3.7.1 and Fleet Portal App Logic -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-    <script src="~/js/fleet-portal.js" asp-append-version="true"></script>
+    <script src="~/js/fleet.js" asp-append-version="true"></script>
     
     @await RenderSectionAsync("Scripts", required: false)
 </body>

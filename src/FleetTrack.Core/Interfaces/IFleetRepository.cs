@@ -24,6 +24,11 @@ public interface IFleetRepository
     Task<SalesOrder> CreateSalesOrderAsync(SalesOrderCreateDto dto, string createdBy, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically executes sp_CreateSalesOrder to create an order and mark unit as sold using CreateSalesOrderRequest.
+    /// </summary>
+    Task<SalesOrder> CreateSalesOrderAsync(CreateSalesOrderRequest request, string createdBy, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves real-time KPI metrics using sp_GetFleetSummaryKpis.
     /// </summary>
     Task<FleetSummaryKpis> GetFleetSummaryKpisAsync(CancellationToken cancellationToken = default);

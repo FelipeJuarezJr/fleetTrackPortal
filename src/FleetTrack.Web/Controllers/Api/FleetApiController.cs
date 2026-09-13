@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace FleetTrack.Web.Controllers.Api;
 
 [ApiController]
+[Route("api/fleet")]
 [Route("api/[controller]")]
 [Produces("application/json")]
 public class FleetApiController : ControllerBase
@@ -20,9 +21,11 @@ public class FleetApiController : ControllerBase
     }
 
     /// <summary>
-    /// GET /api/fleet/available
+    /// GET /api/fleet/units or /api/fleet/available
     /// Retrieves fleet inventory with optional filtering by location, condition status, or search query.
     /// </summary>
+    [HttpGet("units")]
+    [HttpGet("/api/fleet/units")]
     [HttpGet("available")]
     [HttpGet("/api/fleet")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<FleetUnit>>), StatusCodes.Status200OK)]

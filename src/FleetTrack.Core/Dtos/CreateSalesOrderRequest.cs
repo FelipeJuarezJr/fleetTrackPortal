@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace FleetTrack.Core.Dtos;
 
 /// <summary>
-/// Data Transfer Object for creating a sales order.
+/// Data Transfer Object representing the request payload for creating a sales order.
 /// </summary>
-public class SalesOrderCreateDto
+public class CreateSalesOrderRequest
 {
     [Required(ErrorMessage = "Fleet Unit ID is required.")]
     [Range(1, int.MaxValue, ErrorMessage = "A valid Fleet Unit must be selected.")]
@@ -23,14 +23,5 @@ public class SalesOrderCreateDto
     public string? Notes { get; set; }
 
     [StringLength(30, ErrorMessage = "Custom Order Number cannot exceed 30 characters.")]
-    public string? CustomOrderNumber { get; set; }
-
-    /// <summary>
-    /// Alias for CustomOrderNumber to support various JSON payload conventions.
-    /// </summary>
-    public string? OrderNumber
-    {
-        get => CustomOrderNumber;
-        set => CustomOrderNumber = value;
-    }
+    public string? OrderNumber { get; set; }
 }
